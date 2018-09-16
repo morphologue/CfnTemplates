@@ -1,0 +1,82 @@
+Description: Create a VPC with a single, public subnet and an Internet gateway.
+
+Parameters:
+  VpcCidr:
+    Type: String
+    Description: The VPC's network address in CIDR notation
+    Default: 10.0.0.0/16
+  SubnetCidr:
+    Type: String
+    Description: The public subnet's network address in CIDR notation
+    Default: 10.0.16.0/20
+  EnvName:
+    Type: String
+    Description: Resource name prefix representing the environment
+    Default: Prod
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvName}-Vpc-Vpc
+        - Key: EnvName
+          Value: !Ref EnvName
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvName}-Vpc-Igw
+        - Key: EnvName
+          Value: !Ref EnvName
+  VpcGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref Vpc
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Ref SubnetCidr
+      VpcId: !Ref Vpc
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvName}-Vpc-Sub
+        - Key: EnvName
+          Value: !Ref EnvName
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvName}-Vpc-Tab
+        - Key: EnvName
+          Value: !Ref EnvName
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VpcGatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet
+
+Outputs:
+  Vpc:
+    Description: A reference to the created VPC
+    Value: !Ref Vpc
+  Subnet:
+    Description: A reference to the created subnet
+    Value: !Ref Subnet
+    
