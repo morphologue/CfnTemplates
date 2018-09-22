@@ -1,0 +1,45 @@
+Description: Create all the Docker registries required for gavin-tech.
+
+Resources:
+  - Type: AWS::ECR::Repository
+    Properties:
+      LifecyclePolicy: &keep2Newest
+        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
+        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
+      RepositoryName: nginx
+  - Type: AWS::ECR::Repository
+    Properties:
+      LifecyclePolicy: *keep2Newest
+      RepositoryName: exim4relay
+  - Type: AWS::ECR::Repository
+    Properties:
+      LifecyclePolicy: *keep2Newest
+      RepositoryName: exim4local
+  - Type: AWS::ECR::Repository
+    Properties:
+      LifecyclePolicy: *keep2Newest
+      RepositoryName: dovecot
+  - Type: AWS::ECR::Repository
+    Properties:
+      LifecyclePolicy: *keep2Newest
+      RepositoryName: emailauth
+  - Type: AWS::ECR::Repository
+    Properties:
+      LifecyclePolicy: *keep2Newest
+      RepositoryName: clamav
+  - Type: AWS::ECR::Repository
+    Properties:
+      LifecyclePolicy: *keep2Newest
+      RepositoryName: radicale
+  - Type: AWS::ECR::Repository
+    Properties:
+      LifecyclePolicy: *keep2Newest
+      RepositoryName: postback
+  - Type: AWS::ECR::Repository
+    Properties:
+      LifecyclePolicy: *keep2Newest
+      RepositoryName: diary
+  - Type: AWS::ECR::Repository
+    Properties:
+      LifecyclePolicy: *keep2Newest
+      RepositoryName: identityws
