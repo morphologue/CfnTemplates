@@ -1,45 +1,73 @@
 Description: Create all the Docker registries required for gavin-tech.
 
 Resources:
-  - Type: AWS::ECR::Repository
+  NginxRepo:
+    Type: AWS::ECR::Repository
     Properties:
-      LifecyclePolicy: &keep2Newest
+      LifecyclePolicy:
         # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
         LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
       RepositoryName: nginx
-  - Type: AWS::ECR::Repository
+  Exim4relayRepo:
+    Type: AWS::ECR::Repository
     Properties:
-      LifecyclePolicy: *keep2Newest
+      LifecyclePolicy:
+        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
+        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
       RepositoryName: exim4relay
-  - Type: AWS::ECR::Repository
+  Exim4localRepo:
+    Type: AWS::ECR::Repository
     Properties:
-      LifecyclePolicy: *keep2Newest
+      LifecyclePolicy:
+        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
+        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
       RepositoryName: exim4local
-  - Type: AWS::ECR::Repository
+  DovecotRepo:
+    Type: AWS::ECR::Repository
     Properties:
-      LifecyclePolicy: *keep2Newest
+      LifecyclePolicy:
+        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
+        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
       RepositoryName: dovecot
-  - Type: AWS::ECR::Repository
+  EmailauthRepo:
+    Type: AWS::ECR::Repository
     Properties:
-      LifecyclePolicy: *keep2Newest
+      LifecyclePolicy:
+        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
+        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
       RepositoryName: emailauth
-  - Type: AWS::ECR::Repository
+  ClamavRepo:
+    Type: AWS::ECR::Repository
     Properties:
-      LifecyclePolicy: *keep2Newest
+      LifecyclePolicy:
+        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
+        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
       RepositoryName: clamav
-  - Type: AWS::ECR::Repository
+  RadicaleRepo:
+    Type: AWS::ECR::Repository
     Properties:
-      LifecyclePolicy: *keep2Newest
+      LifecyclePolicy:
+        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
+        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
       RepositoryName: radicale
-  - Type: AWS::ECR::Repository
+  PostbackRepo:
+    Type: AWS::ECR::Repository
     Properties:
-      LifecyclePolicy: *keep2Newest
+      LifecyclePolicy:
+        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
+        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
       RepositoryName: postback
-  - Type: AWS::ECR::Repository
+  DiaryRepo:
+    Type: AWS::ECR::Repository
     Properties:
-      LifecyclePolicy: *keep2Newest
+      LifecyclePolicy:
+        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
+        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
       RepositoryName: diary
-  - Type: AWS::ECR::Repository
+  IdentitywsRepo:
+    Type: AWS::ECR::Repository
     Properties:
-      LifecyclePolicy: *keep2Newest
+      LifecyclePolicy:
+        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
+        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
       RepositoryName: identityws
