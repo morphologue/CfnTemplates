@@ -5,69 +5,199 @@ Resources:
     Type: AWS::ECR::Repository
     Properties:
       LifecyclePolicy:
-        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
-        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
+        LifecyclePolicyText: |
+          {
+            "rules": [{
+                "rulePriority": 1,
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 2
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
       RepositoryName: nginx
   Exim4relayRepo:
     Type: AWS::ECR::Repository
     Properties:
       LifecyclePolicy:
-        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
-        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
+        LifecyclePolicyText: |
+          {
+            "rules": [{
+                "rulePriority": 1,
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 2
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
       RepositoryName: exim4relay
   Exim4localRepo:
     Type: AWS::ECR::Repository
     Properties:
       LifecyclePolicy:
-        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
-        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
+        LifecyclePolicyText: |
+          {
+            "rules": [{
+                "rulePriority": 1,
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 2
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
       RepositoryName: exim4local
   DovecotRepo:
     Type: AWS::ECR::Repository
     Properties:
       LifecyclePolicy:
-        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
-        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
+        LifecyclePolicyText: |
+          {
+            "rules": [{
+                "rulePriority": 1,
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 2
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
       RepositoryName: dovecot
   EmailauthRepo:
     Type: AWS::ECR::Repository
     Properties:
       LifecyclePolicy:
-        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
-        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
+        LifecyclePolicyText: |
+          {
+            "rules": [{
+                "rulePriority": 1,
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 2
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
       RepositoryName: emailauth
   ClamavRepo:
     Type: AWS::ECR::Repository
     Properties:
       LifecyclePolicy:
-        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
-        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
+        LifecyclePolicyText: |
+          {
+            "rules": [{
+                "rulePriority": 1,
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 2
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
       RepositoryName: clamav
   RadicaleRepo:
     Type: AWS::ECR::Repository
     Properties:
       LifecyclePolicy:
-        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
-        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
+        LifecyclePolicyText: |
+          {
+            "rules": [{
+                "rulePriority": 1,
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 2
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
       RepositoryName: radicale
   PostbackRepo:
     Type: AWS::ECR::Repository
     Properties:
       LifecyclePolicy:
-        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
-        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
+        LifecyclePolicyText: |
+          {
+            "rules": [{
+                "rulePriority": 1,
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 2
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
       RepositoryName: postback
   DiaryRepo:
     Type: AWS::ECR::Repository
     Properties:
       LifecyclePolicy:
-        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
-        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
+        LifecyclePolicyText: |
+          {
+            "rules": [{
+                "rulePriority": 1,
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 2
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
       RepositoryName: diary
   IdentitywsRepo:
     Type: AWS::ECR::Repository
     Properties:
       LifecyclePolicy:
-        # Yuck! Need to include this JSON as a string. It deletes all but the 2 most recent images.
-        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":2},\"action\":{\"type\":\"expire\"}}]}"
+        LifecyclePolicyText: |
+          {
+            "rules": [{
+                "rulePriority": 1,
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 2
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
       RepositoryName: identityws

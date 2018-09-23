@@ -1,4 +1,6 @@
-Description: Create a VPC with a single, public subnet and an Internet gateway.
+Description: >
+  Create a VPC with a single, public subnet and an Internet gateway. Included are a VPC endpoint to
+  S3 and a private hosted zone.
 
 Parameters:
   VpcCidr:
@@ -13,6 +15,10 @@ Parameters:
     Type: String
     Description: Resource name prefix representing the environment
     Default: Prod
+  PrivateZoneApex:
+    Type: String
+    Description: The name of the private hosted zone to create
+    Default: gavin-tech.com
 
 Resources:
   Vpc:
@@ -71,6 +77,28 @@ Resources:
     Properties:
       RouteTableId: !Ref RouteTable
       SubnetId: !Ref Subnet
+  PrivateHostedZone:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      Name: !Ref PrivateZoneApex
+      VPCs:
+        - VPCId: !Ref Vpc
+          VPCRegion: !Ref AWS::Region
+      HostedZoneTags:
+        - Key: Name
+          Value: !Sub ${EnvName}-Vpc-Tab
+        - Key: EnvName
+          Value: !Ref EnvName
+  VpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      RouteTableIds: [!Ref RouteTable]
+      ServiceName: !Join
+        - "."
+        - - com.amazonaws
+          - !Ref AWS::Region
+          - s3
 
 Outputs:
   Vpc:
@@ -79,4 +107,6 @@ Outputs:
   Subnet:
     Description: A reference to the created subnet
     Value: !Ref Subnet
-    
+  PrivateHostedZone:
+    Description: A reference to the created private hosted zone
+    Value: !Ref PrivateHostedZone
