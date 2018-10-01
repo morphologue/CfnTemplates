@@ -101,12 +101,18 @@ Resources:
           - s3
 
 Outputs:
-  Vpc:
+  VpcId:
     Description: A reference to the created VPC
     Value: !Ref Vpc
-  Subnet:
+    Export:
+      Name: !Sub ${EnvName}-Vpc-Out-VpcId
+  SubnetId:
     Description: A reference to the created subnet
     Value: !Ref Subnet
-  PrivateHostedZone:
+    Export:
+      Name: !Sub ${EnvName}-Vpc-Out-SubnetId
+  PrivateHostedZoneId:
     Description: A reference to the created private hosted zone
     Value: !Ref PrivateHostedZone
+    Export:
+      Name: !Sub ${EnvName}-Vpc-Out-PrivateHostedZoneId

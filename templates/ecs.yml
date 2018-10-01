@@ -1,0 +1,664 @@
+Description: >
+  Create an ECS cluster with a single docker host in the VPC which was created by vpc.yml. Pre-
+  existing EBS and S3 volumes are mounted for the purpose of bind-mounting into containers. Tasks
+  are created based on the images in the repositories which were created by ecr.yml. The containers
+  all use host networking in order to facilitate inter-container communication via port numbers,
+  seeing as ECS has annoyingly disabled Docker's in-built DNS server.
+
+Parameters:
+  EnvName:
+    Type: String
+    Description: Resource name prefix representing the environment, must match the VPC EnvName
+    Default: Prod
+  EcrHostName:
+    Type: String
+    Description: The ECR registry host which is used by ecr.yml
+    Default: 833659022748.dkr.ecr.ap-southeast-2.amazonaws.com
+  DockerEbsVolId:
+    Type: AWS::EC2::Volume::Id
+    Description: The volume ID of the EBS volume containing Docker volumes
+    Default: vol-032fbb619fd5c60bf
+  DockerS3Bucket:
+    Type: String
+    Description: The name of the S3 bucket containing Docker volumes
+    Default: gavintechdockervols
+  KeyPair:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: The key pair to use for SSH
+    Default: GavinTechSydney
+  SshSourceCidr:
+    Type: String
+    Description: Whence SSH is allowed to the EC2 instance
+    Default: 0.0.0.0/0
+  PrivateDnsName:
+    Type: String
+    Description: The name which will be given to the Docker host in the private hosted zone
+    Default: gavin-tech.com
+  EipAllocationId:
+    Type: String
+    Description: If not blank, the allocation ID of an Elastic IP to use for the Docker host
+    Default: eipalloc-053f632cac1d1fc99
+
+Conditions:
+  NeedEipAssociation: !Not [ !Equals [ !Ref EipAllocationId, "" ] ]
+
+Resources:
+  # Start cluster config
+  DbClientSecgroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${EnvName}-Ecs-Dbc
+      GroupDescription: Security group for lambda functions which need the MySQL database
+      VpcId: 
+        Fn::ImportValue:
+          !Sub ${EnvName}-Vpc-Out-VpcId
+  DockerHostSecgroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${EnvName}-Ecs-Sec
+      GroupDescription: Security group for the Docker host
+      VpcId: 
+        Fn::ImportValue:
+          !Sub ${EnvName}-Vpc-Out-VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 25
+          ToPort: 25
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 587
+          ToPort: 587
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 993
+          ToPort: 993
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref SshSourceCidr
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref DbClientSecgroup
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: Allow
+            Principal: 
+              Service: [ "ec2.amazonaws.com" ]
+            Action: [ "sts:AssumeRole" ]
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+      Policies:
+        - PolicyName: !Sub ${EnvName}-Ecs-Pol-VolsFullAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [ "s3:*" ]
+                Resource: arn:aws:s3:::gavintechdockervols
+              - Effect: Allow
+                Action: [ "s3:*" ]
+                Resource: arn:aws:s3:::gavintechdockervols/*
+        - PolicyName: !Sub ${EnvName}-Ecs-Pol-StaticReadOnly
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [ "s3:GetObject" ]
+                Resource: arn:aws:s3:::gavintechstatic/*
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref Role
+  DockerHost:
+    Type: AWS::EC2::Instance
+    Properties:
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvdb
+          Ebs:
+            Encrypted: true
+            VolumeSize: 8
+            VolumeType: gp2
+      IamInstanceProfile: !Ref InstanceProfile
+      ImageId: ami-0321e881c7d4f6146  # Debian 9 (Stretch) HVM AMD64
+      InstanceType: t2.micro
+      KeyName: !Ref KeyPair
+      SecurityGroupIds: 
+        - !Ref DockerHostSecgroup
+      SubnetId:
+        Fn::ImportValue:
+          !Sub ${EnvName}-Vpc-Out-SubnetId
+      Tags: 
+        - Key: Name
+          Value: !Sub ${EnvName}-Ecs-Ec2
+        - Key: EnvName
+          Value: !Ref EnvName
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash
+
+            # General upgrade
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get upgrade -y
+
+            # Swap space
+            dd if=/dev/zero of=/var/swapfile bs=1M count=2048
+            chmod 600 /var/swapfile
+            mkswap -f /var/swapfile
+            echo '/var/swapfile none swap defaults 0 0' >> /etc/fstab
+            swapon -a
+
+            # Mount volumes
+            apt-get install -y s3fs
+            mkfs -t ext4 /dev/xvdb
+            mkdir -p /var/lib/docker
+            echo '/dev/xvdb /var/lib/docker ext4 defaults 0 2' >> /etc/fstab
+            mkdir -p /var/dockervols/ebs
+            echo '/dev/xvdc /var/dockervols/ebs ext4 defaults 0 2' >> /etc/fstab
+            mkdir -p /var/dockervols/s3
+            echo '${DockerS3Bucket} /var/dockervols/s3 fuse.s3fs endpoint=ap-southeast-2,iam_role=${Role},_netdev,allow_other 0 0' >> /etc/fstab
+            mount -a
+
+            # Install Docker (per https://docs.docker.com/install/linux/docker-ce/debian/)
+            apt-get install -y gnupg2 software-properties-common
+            curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
+            add-apt-repository "deb https://download.docker.com/linux/debian stretch stable"
+            apt-get update
+            apt-get install -y docker-ce
+
+            # Install ECS Agent (per https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-agent-install.html)
+            apt-get install -y iptables-persistent
+            echo 'net.ipv4.conf.all.route_localnet = 1' >> /etc/sysctl.conf
+            sysctl -p /etc/sysctl.conf
+            iptables -t nat -A PREROUTING -p tcp -d 169.254.170.2 --dport 80 -j DNAT --to-destination 127.0.0.1:51679
+            iptables -t nat -A OUTPUT -d 169.254.170.2 -p tcp -m tcp --dport 80 -j REDIRECT --to-ports 51679
+            iptables-save > /etc/iptables/rules.v4
+            mkdir -p /etc/ecs /var/log/ecs /var/lib/ecs/data
+            cat <<EOF > /etc/ecs/ecs.config
+            ECS_DATADIR=/data
+            ECS_ENABLE_TASK_IAM_ROLE=true
+            ECS_ENABLE_TASK_IAM_ROLE_NETWORK_HOST=true
+            ECS_LOGFILE=/log/ecs-agent.log
+            ECS_AVAILABLE_LOGGING_DRIVERS=["json-file","awslogs"]
+            ECS_LOGLEVEL=info
+            ECS_CLUSTER=${EnvName}-Ecs-Clu
+            EOF
+            docker run --name ecs-agent --detach --restart=always -v /var/run:/var/run -v /var/log/ecs/:/log -v /var/lib/ecs/data:/data -v /etc/ecs:/etc/ecs --net host --env-file=/etc/ecs/ecs.config amazon/amazon-ecs-agent:latest
+
+            # Install CloudWatch agent (per https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/install-CloudWatch-Agent-on-first-instance.html)
+            apt-get install -y collectd
+            mkdir -p /root/CloudWatchInstall
+            cd /root/CloudWatchInstall
+            wget https://s3.amazonaws.com/amazoncloudwatch-agent/debian/amd64/latest/amazon-cloudwatch-agent.deb
+            dpkg -i amazon-cloudwatch-agent.deb
+            wget https://raw.githubusercontent.com/collectd/collectd/master/src/types.db
+            mkdir -p /usr/share/collectd
+            mv types.db /usr/share/collectd
+            cat <<EOF > config.json
+            {
+              "logs": {
+                "logs_collected": {
+                  "files": {
+                    "collect_list": [
+                      {
+                        "file_path": "/var/log/ecs/*",
+                        "log_group_name": "ecs-agent"
+                      }
+                    ]
+                  }
+                }
+              },
+              "metrics": {
+                "metrics_collected": {
+                  "collectd": {
+                    "metrics_aggregation_interval": 300
+                  },
+                  "cpu": {
+                    "measurement": [
+                      "cpu_usage_idle",
+                      "cpu_usage_iowait",
+                      "cpu_usage_user",
+                      "cpu_usage_system"
+                    ],
+                    "metrics_collection_interval": 300,
+                    "totalcpu": false
+                  },
+                  "disk": {
+                    "measurement": [
+                      "used_percent"
+                    ],
+                    "metrics_collection_interval": 300,
+                    "resources": [
+                      "/",
+                      "/var/lib/docker",
+                      "/var/dockervols/ebs"
+                    ]
+                  },
+                  "mem": {
+                    "measurement": [
+                      "mem_used_percent"
+                    ],
+                    "metrics_collection_interval": 300
+                  },
+                  "netstat": {
+                    "measurement": [
+                      "tcp_established",
+                      "tcp_time_wait"
+                    ],
+                    "metrics_collection_interval": 300
+                  },
+                  "swap": {
+                    "measurement": [
+                      "swap_used_percent"
+                    ],
+                    "metrics_collection_interval": 300
+                  }
+                }
+              }
+            }
+            EOF
+            /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:config.json -s
+            cd -
+            rm -R /root/CloudWatchInstall
+      Volumes: 
+        - Device: /dev/xvdc
+          VolumeId: !Ref DockerEbsVolId
+  EipAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Condition: NeedEipAssociation
+    Properties:
+      AllocationId: !Ref EipAllocationId
+      InstanceId: !Ref DockerHost
+  RecordSetGroup:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneId:
+        Fn::ImportValue:
+          !Sub ${EnvName}-Vpc-Out-PrivateHostedZoneId
+      RecordSets:
+        - Name: !Ref PrivateDnsName
+          Type: A
+          TTL: 300
+          ResourceRecords:
+            - !GetAtt DockerHost.PrivateIp
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    DependsOn: DockerHost
+    Properties:
+      ClusterName: !Sub ${EnvName}-Ecs-Clu
+  # End cluster config
+
+  # Nginx
+  NginxTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      NetworkMode: host
+      ContainerDefinitions:
+        - Image: !Join
+            - "/"
+            - - !Ref EcrHostName
+              - nginx:latest
+          Name: !Sub ${EnvName}-Ecs-Task-Nginx
+          MemoryReservation: 10
+  NginxService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - Exim4relayService
+      - Exim4localService
+      - DovecotService
+      - EmailauthService
+      - ClamavService
+      - RadicaleService
+      - PostbackService
+      - DiaryService
+      - IdentitywsService
+      - SpamassassinService
+    Properties:
+      Cluster: !Ref EcsCluster
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+      DesiredCount: 1
+      TaskDefinition: !Ref NginxTask
+      ServiceName: nginx
+
+  # Exim4 relay
+  Exim4relayTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      NetworkMode: host
+      Volumes:
+        - Host:
+            SourcePath: /var/dockervols/ebs/exim4relay-spool
+          Name: exim4relay-spool
+        - Host:
+            SourcePath: /var/dockervols/ebs/vmail
+          Name: vmail
+      ContainerDefinitions:
+        - Image: !Join
+            - "/"
+            - - !Ref EcrHostName
+              - exim4relay:latest
+          Name: !Sub ${EnvName}-Ecs-Task-Exim4relay
+          MountPoints:
+            - ContainerPath: /var/spool/exim4
+              SourceVolume: exim4relay-spool
+            - ContainerPath: /var/vmail
+              SourceVolume: vmail
+          MemoryReservation: 10
+  Exim4relayService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref EcsCluster
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+      DesiredCount: 1
+      TaskDefinition: !Ref Exim4relayTask
+      ServiceName: exim4relay
+
+  # Exim4 local
+  Exim4localTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      NetworkMode: host
+      Volumes:
+        - Host:
+            SourcePath: /var/dockervols/ebs/exim4local-spool
+          Name: exim4local-spool
+        - Host:
+            SourcePath: /var/dockervols/ebs/vmail
+          Name: vmail
+      ContainerDefinitions:
+        - Image: !Join
+            - "/"
+            - - !Ref EcrHostName
+              - exim4local:latest
+          Name: !Sub ${EnvName}-Ecs-Task-Exim4local
+          MountPoints:
+            - ContainerPath: /var/spool/exim4
+              SourceVolume: exim4local-spool
+            - ContainerPath: /var/vmail
+              SourceVolume: vmail
+          MemoryReservation: 10
+  Exim4localService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref EcsCluster
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+      DesiredCount: 1
+      TaskDefinition: !Ref Exim4localTask
+      ServiceName: exim4local
+
+  # Dovecot
+  DovecotTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      NetworkMode: host
+      Volumes:
+        - Host:
+            SourcePath: /var/dockervols/ebs/vmail
+          Name: vmail
+      ContainerDefinitions:
+        - Image: !Join
+            - "/"
+            - - !Ref EcrHostName
+              - dovecot:latest
+          Name: !Sub ${EnvName}-Ecs-Task-Dovecot
+          MountPoints:
+            - ContainerPath: /var/vmail
+              SourceVolume: vmail
+          MemoryReservation: 10
+  DovecotService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref EcsCluster
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+      DesiredCount: 1
+      TaskDefinition: !Ref DovecotTask
+      ServiceName: dovecot
+
+  # EmailAuth
+  EmailauthTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      NetworkMode: host
+      ContainerDefinitions:
+        - Image: !Join
+            - "/"
+            - - !Ref EcrHostName
+              - emailauth:latest
+          Name: !Sub ${EnvName}-Ecs-Task-Emailauth
+          MemoryReservation: 10
+  EmailauthService:
+    Type: AWS::ECS::Service
+    DependsOn: IdentitywsService
+    Properties:
+      Cluster: !Ref EcsCluster
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+      DesiredCount: 1
+      TaskDefinition: !Ref EmailauthTask
+      ServiceName: emailauth
+
+  # Clamav
+  ClamavTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      NetworkMode: host
+      Volumes:
+        - Host:
+            SourcePath: /var/dockervols/ebs/clamav
+          Name: clamav
+      ContainerDefinitions:
+        - Image: !Join
+            - "/"
+            - - !Ref EcrHostName
+              - clamav:latest
+          Name: !Sub ${EnvName}-Ecs-Task-Clamav
+          MountPoints:
+            - ContainerPath: /data
+              SourceVolume: clamav
+          MemoryReservation: 10
+  ClamavService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref EcsCluster
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+      DesiredCount: 1
+      TaskDefinition: !Ref ClamavTask
+      ServiceName: clamav
+
+  # Radicale
+  RadicaleTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      NetworkMode: host
+      Volumes:
+        - Host:
+            SourcePath: /var/dockervols/ebs/radicale
+          Name: radicale
+      ContainerDefinitions:
+        - Image: !Join
+            - "/"
+            - - !Ref EcrHostName
+              - radicale:latest
+          Name: !Sub ${EnvName}-Ecs-Task-Radicale
+          MountPoints:
+            - ContainerPath: /etc/radicale
+              SourceVolume: radicale
+          MemoryReservation: 10
+  RadicaleService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - EmailauthService
+      - DovecotService
+    Properties:
+      Cluster: !Ref EcsCluster
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+      DesiredCount: 1
+      TaskDefinition: !Ref RadicaleTask
+      ServiceName: radicale
+
+  # Email Postback
+  PostbackTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      NetworkMode: host
+      ContainerDefinitions:
+        - Image: !Join
+            - "/"
+            - - !Ref EcrHostName
+              - postback:latest
+          Name: !Sub ${EnvName}-Ecs-Task-Postback
+          MemoryReservation: 10
+  PostbackService:
+    Type: AWS::ECS::Service
+    DependsOn: IdentitywsService
+    Properties:
+      Cluster: !Ref EcsCluster
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+      DesiredCount: 1
+      TaskDefinition: !Ref PostbackTask
+      ServiceName: postback
+
+  # Diary
+  DiaryTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      NetworkMode: host
+      Volumes:
+        - Host:
+            SourcePath: /var/dockervols/s3/diary_images
+          Name: diary_images
+      ContainerDefinitions:
+        - Image: !Join
+            - "/"
+            - - !Ref EcrHostName
+              - diary:latest
+          Name: !Sub ${EnvName}-Ecs-Task-Diary
+          MountPoints:
+            - ContainerPath: /var/www/diary_images
+              SourceVolume: diary_images
+          MemoryReservation: 10
+  DiaryService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - MysqlService
+      - IdentitywsService
+    Properties:
+      Cluster: !Ref EcsCluster
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+      DesiredCount: 1
+      TaskDefinition: !Ref DiaryTask
+      ServiceName: diary
+  
+  # IdentityWs
+  IdentitywsTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      NetworkMode: host
+      ContainerDefinitions:
+        - Image: !Join
+            - "/"
+            - - !Ref EcrHostName
+              - identityws:latest
+          Name: !Sub ${EnvName}-Ecs-Task-Identityws
+          MemoryReservation: 10
+  IdentitywsService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - MysqlService
+      - Exim4relayService
+    Properties:
+      Cluster: !Ref EcsCluster
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+      DesiredCount: 1
+      TaskDefinition: !Ref IdentitywsTask
+      ServiceName: identityws
+
+  # MySQL
+  MysqlTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      NetworkMode: host
+      Volumes:
+        - Host:
+            SourcePath: /var/dockervols/ebs/mysql
+          Name: mysql
+      ContainerDefinitions:
+        - Image: mysql:5.7  # Public Docker Hub
+          Name: !Sub ${EnvName}-Ecs-Task-Mysql
+          MountPoints:
+            - ContainerPath: /var/lib/mysql
+              SourceVolume: mysql
+          MemoryReservation: 10
+  MysqlService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref EcsCluster
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+      DesiredCount: 1
+      TaskDefinition: !Ref MysqlTask
+      ServiceName: mysql
+
+  # Spamassassin
+  SpamassassinTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      NetworkMode: host
+      ContainerDefinitions:
+        - Image: dinkel/spamassassin:latest  # Public Docker Hub
+          Name: !Sub ${EnvName}-Ecs-Task-Spamassassin
+          MemoryReservation: 10
+  SpamassassinService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref EcsCluster
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+      DesiredCount: 1
+      TaskDefinition: !Ref SpamassassinTask
+      ServiceName: spamassassin
+
+Outputs:
+  DbClientSecgroup:
+    Description: A reference to the security group for direct database access
+    Value: !Ref DbClientSecgroup
+    Export:
+      Name: !Sub ${EnvName}-Ecs-Out-DbClientSecgroup
