@@ -185,12 +185,6 @@ Resources:
             apt-get install -y docker-ce
 
             # Install ECS Agent (per https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-agent-install.html)
-            apt-get install -y iptables-persistent
-            echo 'net.ipv4.conf.all.route_localnet = 1' >> /etc/sysctl.conf
-            sysctl -p /etc/sysctl.conf
-            iptables -t nat -A PREROUTING -p tcp -d 169.254.170.2 --dport 80 -j DNAT --to-destination 127.0.0.1:51679
-            iptables -t nat -A OUTPUT -d 169.254.170.2 -p tcp -m tcp --dport 80 -j REDIRECT --to-ports 51679
-            iptables-save > /etc/iptables/rules.v4
             mkdir -p /etc/ecs /var/log/ecs /var/lib/ecs/data
             cat <<EOF > /etc/ecs/ecs.config
             ECS_DATADIR=/data
@@ -318,6 +312,12 @@ Resources:
               - nginx:latest
           Name: !Sub ${EnvName}-Ecs-Task-Nginx
           MemoryReservation: 10
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: containers
+              awslogs-region: ap-southeast-2
+              awslogs-stream-prefix: nginx
   NginxService:
     Type: AWS::ECS::Service
     DependsOn:
@@ -325,7 +325,6 @@ Resources:
       - Exim4localService
       - DovecotService
       - EmailauthService
-      - ClamavService
       - RadicaleService
       - PostbackService
       - DiaryService
@@ -364,6 +363,12 @@ Resources:
             - ContainerPath: /var/vmail
               SourceVolume: vmail
           MemoryReservation: 10
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: containers
+              awslogs-region: ap-southeast-2
+              awslogs-stream-prefix: exim4relay
   Exim4relayService:
     Type: AWS::ECS::Service
     Properties:
@@ -399,6 +404,12 @@ Resources:
             - ContainerPath: /var/vmail
               SourceVolume: vmail
           MemoryReservation: 10
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: containers
+              awslogs-region: ap-southeast-2
+              awslogs-stream-prefix: exim4local
   Exim4localService:
     Type: AWS::ECS::Service
     Properties:
@@ -429,6 +440,12 @@ Resources:
             - ContainerPath: /var/vmail
               SourceVolume: vmail
           MemoryReservation: 10
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: containers
+              awslogs-region: ap-southeast-2
+              awslogs-stream-prefix: dovecot
   DovecotService:
     Type: AWS::ECS::Service
     Properties:
@@ -452,6 +469,12 @@ Resources:
               - emailauth:latest
           Name: !Sub ${EnvName}-Ecs-Task-Emailauth
           MemoryReservation: 10
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: containers
+              awslogs-region: ap-southeast-2
+              awslogs-stream-prefix: emailauth
   EmailauthService:
     Type: AWS::ECS::Service
     DependsOn: IdentitywsService
@@ -463,36 +486,6 @@ Resources:
       DesiredCount: 1
       TaskDefinition: !Ref EmailauthTask
       ServiceName: emailauth
-
-  # Clamav
-  ClamavTask:
-    Type: AWS::ECS::TaskDefinition
-    Properties:
-      NetworkMode: host
-      Volumes:
-        - Host:
-            SourcePath: /var/dockervols/ebs/clamav
-          Name: clamav
-      ContainerDefinitions:
-        - Image: !Join
-            - "/"
-            - - !Ref EcrHostName
-              - clamav:latest
-          Name: !Sub ${EnvName}-Ecs-Task-Clamav
-          MountPoints:
-            - ContainerPath: /data
-              SourceVolume: clamav
-          MemoryReservation: 10
-  ClamavService:
-    Type: AWS::ECS::Service
-    Properties:
-      Cluster: !Ref EcsCluster
-      DeploymentConfiguration:
-        MaximumPercent: 100
-        MinimumHealthyPercent: 0
-      DesiredCount: 1
-      TaskDefinition: !Ref ClamavTask
-      ServiceName: clamav
 
   # Radicale
   RadicaleTask:
@@ -513,6 +506,12 @@ Resources:
             - ContainerPath: /etc/radicale
               SourceVolume: radicale
           MemoryReservation: 10
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: containers
+              awslogs-region: ap-southeast-2
+              awslogs-stream-prefix: radicale
   RadicaleService:
     Type: AWS::ECS::Service
     DependsOn:
@@ -539,6 +538,12 @@ Resources:
               - postback:latest
           Name: !Sub ${EnvName}-Ecs-Task-Postback
           MemoryReservation: 10
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: containers
+              awslogs-region: ap-southeast-2
+              awslogs-stream-prefix: postback
   PostbackService:
     Type: AWS::ECS::Service
     DependsOn: IdentitywsService
@@ -570,6 +575,12 @@ Resources:
             - ContainerPath: /var/www/diary_images
               SourceVolume: diary_images
           MemoryReservation: 10
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: containers
+              awslogs-region: ap-southeast-2
+              awslogs-stream-prefix: diary
   DiaryService:
     Type: AWS::ECS::Service
     DependsOn:
@@ -596,6 +607,12 @@ Resources:
               - identityws:latest
           Name: !Sub ${EnvName}-Ecs-Task-Identityws
           MemoryReservation: 10
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: containers
+              awslogs-region: ap-southeast-2
+              awslogs-stream-prefix: identityws
   IdentitywsService:
     Type: AWS::ECS::Service
     DependsOn:
@@ -626,6 +643,12 @@ Resources:
             - ContainerPath: /var/lib/mysql
               SourceVolume: mysql
           MemoryReservation: 10
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: containers
+              awslogs-region: ap-southeast-2
+              awslogs-stream-prefix: mysql
   MysqlService:
     Type: AWS::ECS::Service
     Properties:
@@ -653,6 +676,12 @@ Resources:
             - ContainerPath: /var/lib/spamassassin
               SourceVolume: spamassassin
           MemoryReservation: 10
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: containers
+              awslogs-region: ap-southeast-2
+              awslogs-stream-prefix: spamassassin
   SpamassassinService:
     Type: AWS::ECS::Service
     Properties:
