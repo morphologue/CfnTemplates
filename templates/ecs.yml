@@ -135,7 +135,7 @@ Resources:
             VolumeSize: 8
             VolumeType: gp2
       IamInstanceProfile: !Ref InstanceProfile
-      ImageId: ami-0321e881c7d4f6146  # Debian 9 (Stretch) HVM AMD64
+      ImageId: ami-09084b4beb1a9ce00  # Debian 10 (Buster) 64-bit
       InstanceType: t2.micro
       DisableApiTermination: true
       KeyName: !Ref KeyPair
@@ -330,7 +330,6 @@ Resources:
       - DiaryService
       - IdentitywsService
       - SpamassassinService
-      - CoffeefreedomService
     Properties:
       Cluster: !Ref EcsCluster
       DeploymentConfiguration:
@@ -627,35 +626,6 @@ Resources:
       DesiredCount: 1
       TaskDefinition: !Ref IdentitywsTask
       ServiceName: identityws
-
-  # IdentityWs
-  CoffeefreedomTask:
-    Type: AWS::ECS::TaskDefinition
-    Properties:
-      NetworkMode: host
-      ContainerDefinitions:
-        - Image: !Join
-            - "/"
-            - - !Ref EcrHostName
-              - coffeefreedom:latest
-          Name: !Sub ${EnvName}-Ecs-Task-Coffeefreedom
-          MemoryReservation: 10
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: containers
-              awslogs-region: ap-southeast-2
-              awslogs-stream-prefix: coffeefreedom
-  CoffeefreedomService:
-    Type: AWS::ECS::Service
-    Properties:
-      Cluster: !Ref EcsCluster
-      DeploymentConfiguration:
-        MaximumPercent: 100
-        MinimumHealthyPercent: 0
-      DesiredCount: 1
-      TaskDefinition: !Ref CoffeefreedomTask
-      ServiceName: coffeefreedom
 
   # MySQL
   MysqlTask:

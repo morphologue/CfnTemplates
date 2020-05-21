@@ -181,23 +181,3 @@ Resources:
             ]
           }
       RepositoryName: identityws
-  CoffeeFreedomRepo:
-    Type: AWS::ECR::Repository
-    Properties:
-      LifecyclePolicy:
-        LifecyclePolicyText: |
-          {
-            "rules": [{
-                "rulePriority": 1,
-                "selection": {
-                  "tagStatus": "any",
-                  "countType": "imageCountMoreThan",
-                  "countNumber": 2
-                },
-                "action": {
-                  "type": "expire"
-                }
-              }
-            ]
-          }
-      RepositoryName: coffeefreedom
